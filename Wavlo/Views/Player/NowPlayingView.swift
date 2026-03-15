@@ -39,7 +39,7 @@ struct NowPlayingView: View {
     private func header(song: Song) -> some View {
         HStack {
             Button { dismiss() } label: {
-                Image(systemName: "chevron.down")
+                Image(systemName: "chevron.left")
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(colors.textPrimary)
             }
@@ -62,7 +62,24 @@ struct NowPlayingView: View {
                 }
             }
             Spacer()
-            Color.clear.frame(width: 44, height: 44)
+            HStack(spacing: 16) {
+                Button {
+                    playerVM.toggleLike(song)
+                } label: {
+                    Image(systemName: song.isLiked ? "heart.fill" : "heart")
+                        .font(.system(size: 22))
+                        .foregroundStyle(song.isLiked ? colors.primaryAccent : colors.textPrimary)
+                }
+                .buttonStyle(.plain)
+                Button {
+                    // More options: add to playlist, share, etc. (stub)
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(colors.textPrimary)
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding(.horizontal)
         .padding(.bottom, 16)
@@ -88,21 +105,10 @@ struct NowPlayingView: View {
             .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
 
             VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .center, spacing: 8) {
-                    Text(song.title)
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundStyle(colors.textPrimary)
-                        .lineLimit(1)
-                    Spacer(minLength: 8)
-                    Button {
-                        playerVM.toggleLike(song)
-                    } label: {
-                        Image(systemName: song.isLiked ? "heart.fill" : "heart")
-                            .font(.system(size: 24))
-                            .foregroundStyle(song.isLiked ? colors.primaryAccent : colors.textSecondary)
-                    }
-                    .buttonStyle(.plain)
-                }
+                Text(song.title)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(colors.textPrimary)
+                    .lineLimit(1)
                 Text(song.artistName)
                     .font(.system(size: 16, weight: .regular))
                     .foregroundStyle(colors.textSecondary)
@@ -147,7 +153,7 @@ struct NowPlayingView: View {
             SlimProgressBar(
                 progress: playerVM.duration > 0 ? playerVM.currentTime / playerVM.duration : 0,
                 colors: colors,
-                onSeek: { playerVM.seek(to: $0 * playerVM.duration) }
+                onSeek: { progress in playerVM.seek(to: progress) }
             )
             .padding(.horizontal)
 

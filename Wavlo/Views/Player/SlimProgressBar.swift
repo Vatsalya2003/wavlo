@@ -10,7 +10,7 @@ struct SlimProgressBar: View {
 
     var body: some View {
         GeometryReader { geo in
-            let width = geo.size.width
+            let width = max(1, geo.size.width)
             ZStack(alignment: .leading) {
                 Capsule()
                     .fill(colors.textMuted.opacity(0.3))
@@ -21,7 +21,9 @@ struct SlimProgressBar: View {
                     .frame(width: width * progress, height: 3)
             }
             .frame(height: 3)
+            .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
+            .frame(height: 44)
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
@@ -35,7 +37,7 @@ struct SlimProgressBar: View {
                     }
             )
         }
-        .frame(height: 3)
+        .frame(height: 44)
     }
 }
 

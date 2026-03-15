@@ -53,7 +53,7 @@ struct WavloColors {
     let primaryAccent: Color
 
     // Accents (same in both themes)
-    static let accentGreen = Color(hex: "1DB954")
+    static let accentGreen = Color(hex: "D9ED92")
     static let accentGreenDark = Color(hex: "1AA34A")
     static let accentGreenLight = Color(hex: "1ED760")
     static let accentNavy = Color(hex: "2F4156")
@@ -75,7 +75,7 @@ struct WavloColors {
         textMuted: Color(hex: "8A8480"),
         borderSubtle: Color(hex: "3A3A3A"),
         borderDefault: Color(hex: "4A4A4A"),
-        primaryAccent: Color(hex: "B0C0CC")
+        primaryAccent: Color(hex: "D9ED92")
     )
 
     // Light theme — Beige base, Navy text, Harbor accent

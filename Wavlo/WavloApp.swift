@@ -1,14 +1,18 @@
 import SwiftUI
 import SwiftData
 import AVFoundation
+import FirebaseCore
 
 @main
 struct WavloApp: App {
 
     let modelContainer: ModelContainer
     @StateObject private var themeManager = ThemeManager()
+    @StateObject private var authVM = AuthViewModel()
 
     init() {
+        // Configure Firebase before anything touches Auth.auth()
+        FirebaseApp.configure()
         let schema = Schema([
             Song.self,
             Playlist.self,
@@ -66,6 +70,7 @@ struct WavloApp: App {
             RootView()
                 .environmentObject(PlayerViewModel.shared)
                 .environmentObject(themeManager)
+                .environmentObject(authVM)
         }
         .modelContainer(modelContainer)
     }

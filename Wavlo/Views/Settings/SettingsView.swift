@@ -5,6 +5,7 @@ struct SettingsView: View {
 
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var theme: ThemeManager
+    @EnvironmentObject private var authVM: AuthViewModel
     @Query private var prefs: [UserPreferences]
 
     private var userPrefs: UserPreferences? { prefs.first }
@@ -44,7 +45,7 @@ struct SettingsView: View {
 
             Section {
                 Button("Log out") {
-                    // No-op or clear session when auth is added
+                    authVM.signOut()
                 }
                 .frame(maxWidth: .infinity)
                 .foregroundStyle(colors.textPrimary)
@@ -72,9 +73,17 @@ struct SettingsView: View {
                     .resizable()
                     .frame(width: 80, height: 80)
                     .foregroundStyle(colors.textMuted)
-                Text(userPrefs?.displayName ?? "Wavlo User")
+                Text(authVM.displayName ?? userPrefs?.displayName ?? "Wavlo User")
                     .font(Constants.Typography.titleMedium)
                     .foregroundStyle(colors.textPrimary)
+                if let email = authVM.email {
+                    Text(email)
+                        .font(Constants.Typography.bodySmall)
+                        .foregroundStyle(colors.textSecondary)
+                }
+                Text("Signed in with \(authVM.providerName)")
+                    .font(Constants.Typography.caption)
+                    .foregroundStyle(colors.textMuted)
                 Text("View Profile")
                     .font(Constants.Typography.bodySmall)
                     .foregroundStyle(colors.primaryAccent)

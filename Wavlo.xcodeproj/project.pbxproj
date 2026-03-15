@@ -6,6 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		F16B2D282F66D8B900827B13 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = F16B2D272F66D8B900827B13 /* FirebaseAuth */; };
+		F16B2D2A2F66D8C000827B13 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = F16B2D292F66D8C000827B13 /* FirebaseCore */; };
+		F16B2D2C2F66D8C600827B13 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = F16B2D2B2F66D8C600827B13 /* GoogleSignIn */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		F155FC762F64EA870070B1B9 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -65,6 +71,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F16B2D2A2F66D8C000827B13 /* FirebaseCore in Frameworks */,
+				F16B2D282F66D8B900827B13 /* FirebaseAuth in Frameworks */,
+				F16B2D2C2F66D8C600827B13 /* GoogleSignIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -91,6 +100,7 @@
 				F155FC652F64EA840070B1B9 /* Wavlo */,
 				F155FC782F64EA870070B1B9 /* WavloTests */,
 				F155FC822F64EA870070B1B9 /* WavloUITests */,
+				F16B2D262F66D8B900827B13 /* Frameworks */,
 				F155FC642F64EA840070B1B9 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -103,6 +113,13 @@
 				F155FC7F2F64EA870070B1B9 /* WavloUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		F16B2D262F66D8B900827B13 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -125,6 +142,9 @@
 			);
 			name = Wavlo;
 			packageProductDependencies = (
+				F16B2D272F66D8B900827B13 /* FirebaseAuth */,
+				F16B2D292F66D8C000827B13 /* FirebaseCore */,
+				F16B2D2B2F66D8C600827B13 /* GoogleSignIn */,
 			);
 			productName = Wavlo;
 			productReference = F155FC632F64EA840070B1B9 /* Wavlo.app */;
@@ -208,6 +228,10 @@
 			);
 			mainGroup = F155FC5A2F64EA840070B1B9;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				F16B2C872F66C7D100827B13 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				F16B2C882F66C83C00827B13 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F155FC642F64EA840070B1B9 /* Products */;
 			projectDirPath = "";
@@ -415,7 +439,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Wavlo/Info.plist;
-				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Wavlo uses your microphone for voice search and AI DJ commands.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Wavlo uses speech recognition to understand your voice requests.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -451,7 +476,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Wavlo/Info.plist;
-				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Wavlo uses your microphone for voice search and AI DJ commands.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Wavlo uses speech recognition to understand your voice requests.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -599,6 +625,43 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		F16B2C872F66C7D100827B13 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.10.0;
+			};
+		};
+		F16B2C882F66C83C00827B13 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.1.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		F16B2D272F66D8B900827B13 /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F16B2C872F66C7D100827B13 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		F16B2D292F66D8C000827B13 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F16B2C872F66C7D100827B13 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		F16B2D2B2F66D8C600827B13 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F16B2C882F66C83C00827B13 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = F155FC5B2F64EA840070B1B9 /* Project object */;
 }
