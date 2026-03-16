@@ -68,6 +68,7 @@ struct WavloColors {
     static let dark = WavloColors(
         bgPrimary: Color(hex: "2A2A2A"),
         bgCard: Color(hex: "323232"),
+        bgCardMiniPLayer: Color(hex: "323232"),
         bgElevated: Color(hex: "3A3A3A"),
         bgInput: Color(hex: "3E3E3E"),
         textPrimary: Color(hex: "F5EFEB"),

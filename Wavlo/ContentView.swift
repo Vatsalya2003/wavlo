@@ -2,36 +2,31 @@ import SwiftUI
 import SwiftData
 import UIKit
 
-// MARK: - Root (onboarding → auth → main app)
+// MARK: - Root (onboarding/welcome → auth → main app)
 
 struct RootView: View {
 
-    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @EnvironmentObject private var playerVM: PlayerViewModel
     @EnvironmentObject private var theme: ThemeManager
     @EnvironmentObject private var authVM: AuthViewModel
 
     var body: some View {
         Group {
-            if !hasCompletedOnboarding {
-                OnboardingView()
-            } else {
-                switch authVM.authState {
-                case .loading:
-                    ProgressView()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(theme.colors.bgPrimary)
-                case .unauthenticated:
-                    NavigationStack {
-                        WelcomeView()
-                    }
-                case .emailNotVerified:
-                    NavigationStack {
-                        EmailVerificationView()
-                    }
-                case .authenticated:
-                    ContentView()
+            switch authVM.authState {
+            case .loading:
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(theme.colors.bgPrimary)
+            case .unauthenticated:
+                NavigationStack {
+                    OnboardingView()
                 }
+            case .emailNotVerified:
+                NavigationStack {
+                    EmailVerificationView()
+                }
+            case .authenticated:
+                ContentView()
             }
         }
         .preferredColorScheme(theme.isDarkMode ? .dark : .light)

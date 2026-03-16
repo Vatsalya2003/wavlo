@@ -9,6 +9,8 @@ struct NowPlayingView: View {
     @State private var showLyricsTab = false
     @State private var lyricsText: String?
     @State private var isLoadingLyrics = false
+    @State private var showAddToPlaylistSheet = false
+    @State private var showQueueSheet = false
 
     private var colors: WavloColors { theme.colors }
 
@@ -27,6 +29,7 @@ struct NowPlayingView: View {
 
                     progressSection
                     playbackControls()
+                    bottomRow
                 }
                 .padding(.vertical, 24)
             } else {
@@ -34,6 +37,18 @@ struct NowPlayingView: View {
             }
         }
         .presentationDetents([.large])
+        .sheet(isPresented: $showAddToPlaylistSheet) {
+            if let song = playerVM.currentSong {
+                AddToPlaylistSheet(song: song)
+                    .environmentObject(theme)
+            }
+        }
+        .sheet(isPresented: $showQueueSheet) {
+            QueueView()
+                .environmentObject(playerVM)
+                .environmentObject(theme)
+                .presentationDetents([.medium, .large])
+        }
     }
 
     private func header(song: Song) -> some View {
@@ -72,7 +87,7 @@ struct NowPlayingView: View {
                 }
                 .buttonStyle(.plain)
                 Button {
-                    // More options: add to playlist, share, etc. (stub)
+                    showAddToPlaylistSheet = true
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 20, weight: .medium))
@@ -189,6 +204,43 @@ struct NowPlayingView: View {
             }
         }
         .padding(.top, 24)
+    }
+
+    private var bottomRow: some View {
+        HStack(spacing: 12) {
+            if let device = playerVM.currentOutputDevice {
+                HStack(spacing: 6) {
+                    Image(systemName: device.iconSystemName)
+                        .font(.system(size: 14, weight: .medium))
+                    Text(device.name)
+                        .font(Constants.Typography.caption)
+                        .lineLimit(1)
+                }
+                .foregroundStyle(WavloColors.accentGreen)
+            }
+            Spacer()
+            HStack(spacing: 18) {
+                Button {
+                    // Share (stub)
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(colors.textSecondary)
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    showQueueSheet = true
+                } label: {
+                    Image(systemName: "list.bullet")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(colors.textSecondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.top, 14)
     }
 
     private var emptyState: some View {

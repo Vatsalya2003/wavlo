@@ -20,10 +20,18 @@ actor AudioPlayerService {
     private var queuePlayer: AVQueuePlayer?
     private var timeObserver: Any?
     private var currentItemObserver: NSKeyValueObservation?
+    private var statusObserver: NSKeyValueObservation?
+    /// Last current item ID so we can detect when a song finishes (transition to next or nil).
+    private var lastCurrentItemID: String?
+    /// Last item in queue so we can append new items after it.
+    private var lastQueuedItem: AVPlayerItem?
 
     nonisolated(unsafe) var onPlaybackProgress: ((Double, Double) -> Void)?
-    nonisolated(unsafe) var onPlaybackFinished: (() -> Void)?
+    /// Called when a track finishes (natural end). Passes the finished song ID.
+    nonisolated(unsafe) var onPlaybackFinished: ((String?) -> Void)?
     nonisolated(unsafe) var onCurrentItemChanged: ((String?) -> Void)?
+    /// Called when the player play/pause state changes (driven by timeControlStatus).
+    nonisolated(unsafe) var onIsPlayingChanged: ((Bool) -> Void)?
 
     init() {
         setupPlayer()
@@ -34,6 +42,7 @@ actor AudioPlayerService {
         queuePlayer?.actionAtItemEnd = .advance
         addPeriodicTimeObserver()
         observeCurrentItem()
+        observeTimeControlStatus()
     }
 
     private func addPeriodicTimeObserver() {
@@ -58,36 +67,73 @@ actor AudioPlayerService {
         currentItemObserver = queuePlayer?.observe(\.currentItem, options: [.new]) { [weak queuePlayer] player, _ in
             let id = (player.currentItem as? AVPlayerItem)?.wavloSongID
             Task { [id] in
-                // Hop to the actor to safely read the callback reference
-                let callback = await self.onCurrentItemChanged
+                await self.handleCurrentItemChanged(newID: id)
+            }
+        }
+    }
+
+    private func observeTimeControlStatus() {
+        statusObserver = queuePlayer?.observe(\.timeControlStatus, options: [.new]) { [weak self] player, _ in
+            let playing = player.timeControlStatus == .playing
+            Task { [playing] in
+                let callback = await self?.onIsPlayingChanged
                 await MainActor.run {
-                    callback?(id)
+                    callback?(playing)
                 }
             }
         }
     }
 
+    private func handleCurrentItemChanged(newID: String?) {
+        if let previousID = lastCurrentItemID, previousID != newID {
+            let callback = onPlaybackFinished
+            Task { @MainActor in callback?(previousID) }
+        }
+        lastCurrentItemID = newID
+        let callback = onCurrentItemChanged
+        Task { @MainActor in callback?(newID) }
+    }
+
     func replaceQueue(with urls: [URL], startIndex: Int = 0, songIDs: [String]) {
         queuePlayer?.removeAllItems()
+        lastQueuedItem = nil
+        lastCurrentItemID = nil
         guard !urls.isEmpty, startIndex < urls.count else { return }
         let assets = urls.map { AVURLAsset(url: $0) }
-        let items = assets.enumerated().map { index, asset -> AVPlayerItem in
+        var after: AVPlayerItem? = nil
+        for (index, asset) in assets.enumerated() {
             let item = AVPlayerItem(asset: asset)
             item.wavloSongID = index < songIDs.count ? songIDs[index] : ""
-            return item
-        }
-        for item in items {
-            if queuePlayer?.canInsert(item, after: nil) == true {
-                queuePlayer?.insert(item, after: nil)
+            if queuePlayer?.canInsert(item, after: after) == true {
+                queuePlayer?.insert(item, after: after)
+                after = item
             }
         }
+        lastQueuedItem = after
         queuePlayer?.seek(to: .zero)
         if startIndex > 0 {
             for _ in 0..<startIndex {
                 queuePlayer?.advanceToNextItem()
             }
         }
-        onCurrentItemChanged?(songIDs[safe: startIndex])
+        lastCurrentItemID = songIDs[safe: startIndex]
+        let startID = songIDs[safe: startIndex]
+        Task { @MainActor in onCurrentItemChanged?(startID) }
+    }
+
+    /// Appends songs to the end of the queue (for auto-queue recommendations).
+    func appendToQueue(urls: [URL], songIDs: [String]) {
+        guard !urls.isEmpty, let player = queuePlayer else { return }
+        var after = lastQueuedItem
+        for (index, url) in urls.enumerated() {
+            let item = AVPlayerItem(asset: AVURLAsset(url: url))
+            item.wavloSongID = index < songIDs.count ? songIDs[index] : ""
+            if player.canInsert(item, after: after) {
+                player.insert(item, after: after)
+                after = item
+            }
+        }
+        lastQueuedItem = after
     }
 
     func play() {
@@ -142,6 +188,7 @@ actor AudioPlayerService {
             queuePlayer?.removeTimeObserver(observer)
         }
         currentItemObserver?.invalidate()
+        statusObserver?.invalidate()
     }
 }
 

@@ -7,6 +7,7 @@ struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var playerVM: PlayerViewModel
     @EnvironmentObject private var theme: ThemeManager
+    @EnvironmentObject private var authVM: AuthViewModel
     @State private var showSettings = false
     @State private var filterPill = "All"
 
@@ -122,10 +123,25 @@ struct HomeView: View {
             Button {
                 showSettings = true
             } label: {
-                Image(systemName: "person.circle.fill")
-                    .resizable()
+                if let url = authVM.profilePhotoURL {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        default:
+                            Image(systemName: "person.circle.fill")
+                                .resizable()
+                                .foregroundStyle(colors.textSecondary)
+                        }
+                    }
                     .frame(width: 36, height: 36)
-                    .foregroundStyle(colors.textSecondary)
+                    .clipShape(Circle())
+                } else {
+                    Image(systemName: "person.circle.fill")
+                        .resizable()
+                        .frame(width: 36, height: 36)
+                        .foregroundStyle(colors.textSecondary)
+                }
             }
 
             ScrollView(.horizontal, showsIndicators: false) {

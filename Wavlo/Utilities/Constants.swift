@@ -129,6 +129,20 @@ Current mood: \(currentMood)
 Use this to personalize. Match their taste while introducing songs they might not know yet.
 """
         }
+
+        /// Prompt for auto-queue recommendations (Layer 3 — Gemini). Returns JSON array of "Song Name Artist Name".
+        static func recommendationPrompt(songName: String, artistName: String) -> String {
+            """
+            Given the user is listening to "\(songName)" by \(artistName), suggest 10 similar songs that match the same vibe, energy, and mood. Consider:
+            - Same genre and sub-genre
+            - Similar tempo and energy level
+            - Same era (recent hits with recent, classics with classics)
+            - Artists that fans of \(artistName) typically also enjoy
+            - Mix of popular and slightly lesser-known tracks for discovery
+
+            Return ONLY a JSON array of strings, each string is "Song Name Artist Name". Example: ["Starboy The Weeknd", "Save Your Tears The Weeknd"]
+            """
+        }
     }
 
     // MARK: - Mood → Search Query (JioSaavn)

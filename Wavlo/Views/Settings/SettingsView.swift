@@ -69,10 +69,25 @@ struct SettingsView: View {
     private var profileSection: some View {
         Section {
             VStack(spacing: 12) {
-                Image(systemName: "person.circle.fill")
-                    .resizable()
+                if let url = authVM.profilePhotoURL {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        default:
+                            Image(systemName: "person.circle.fill")
+                                .resizable()
+                                .foregroundStyle(colors.textMuted)
+                        }
+                    }
                     .frame(width: 80, height: 80)
-                    .foregroundStyle(colors.textMuted)
+                    .clipShape(Circle())
+                } else {
+                    Image(systemName: "person.circle.fill")
+                        .resizable()
+                        .frame(width: 80, height: 80)
+                        .foregroundStyle(colors.textMuted)
+                }
                 Text(authVM.displayName ?? userPrefs?.displayName ?? "Wavlo User")
                     .font(Constants.Typography.titleMedium)
                     .foregroundStyle(colors.textPrimary)

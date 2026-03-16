@@ -21,10 +21,6 @@ struct SearchView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    Text("Search")
-                        .font(Constants.Typography.displayMedium)
-                        .foregroundStyle(colors.textPrimary)
-
                     GenreFilterView(selectedGenre: $selectedGenre)
                         .onChange(of: selectedGenre) { _, newValue in
                             if newValue != "All" {
@@ -70,6 +66,8 @@ struct SearchView: View {
                                 SongRowView(
                                     song: song,
                                     onTap: {
+                                        // Dismiss keyboard when user starts playback from search
+                                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                                         if let idx = displayedSongs.firstIndex(where: { $0.id == song.id }) {
                                             playerVM.play(songs: displayedSongs, startIndex: idx)
                                         }
@@ -110,7 +108,6 @@ struct SearchView: View {
             .background(colors.bgPrimary)
             .navigationTitle("Search")
             .navigationBarTitleDisplayMode(.large)
-            .wavloKeyboardDismissToolbar()
         }
     }
 }

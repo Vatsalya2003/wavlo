@@ -57,12 +57,32 @@ struct SongRowView: View {
                     }
                     .buttonStyle(.plain)
                 } else {
-                    Button(action: onLike) {
-                        Image(systemName: song.isLiked ? "heart.fill" : "heart")
-                            .font(.system(size: 18))
-                            .foregroundStyle(song.isLiked ? colors.primaryAccent : colors.textSecondary)
+                    HStack(spacing: 12) {
+                        Button(action: onLike) {
+                            Image(systemName: song.isLiked ? "heart.fill" : "heart")
+                                .font(.system(size: 18))
+                                .foregroundStyle(song.isLiked ? colors.primaryAccent : colors.textSecondary)
+                        }
+                        .buttonStyle(.plain)
+                        Menu {
+                            Button {
+                                playerVM.isPresentingFullPlayer = true
+                            } label: {
+                                Label("Go to Now Playing", systemImage: "music.note")
+                            }
+                            Button {
+                                // This will be handled by parent using .environment(\.selectedSongForPlaylist)
+                                NotificationCenter.default.post(name: .wavloAddToPlaylist, object: song)
+                            } label: {
+                                Label("Add to Playlist", systemImage: "text.badge.plus")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(colors.textSecondary)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 12)
@@ -73,6 +93,10 @@ struct SongRowView: View {
         }
         .buttonStyle(.plain)
     }
+}
+
+extension Notification.Name {
+    static let wavloAddToPlaylist = Notification.Name("wavloAddToPlaylist")
 }
 
 #Preview {

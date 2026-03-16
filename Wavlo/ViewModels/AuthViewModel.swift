@@ -24,6 +24,7 @@ final class AuthViewModel: ObservableObject {
     var currentUser: User? { authService.currentUser }
     var displayName: String? { authService.currentUser?.displayName ?? authService.currentUser?.email?.components(separatedBy: "@").first }
     var email: String? { authService.currentUser?.email }
+    var profilePhotoURL: URL? { authService.currentUser?.photoURL }
     var isEmailVerified: Bool { authService.isEmailVerified }
     var providerName: String {
         if authService.currentUser?.providerData.first?.providerID.contains("google") == true {
