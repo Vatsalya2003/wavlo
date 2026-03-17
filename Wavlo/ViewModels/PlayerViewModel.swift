@@ -7,6 +7,18 @@ import MediaPlayer
 import UIKit
 import AVFoundation
 
+// MARK: - Lyrics cache (used by PlayerViewModel, NowPlayingView, LyricsView)
+
+enum LyricsSource: String, Sendable {
+    case jiosaavn
+    case gemini
+}
+
+struct CachedLyrics: Sendable {
+    let text: String
+    let source: LyricsSource
+}
+
 @MainActor
 final class PlayerViewModel: ObservableObject {
 
@@ -18,6 +30,11 @@ final class PlayerViewModel: ObservableObject {
 
     @Published var currentSong: Song?
     @Published var queue: [Song] = []
+
+    /// Lyrics cache by song ID; never fetch the same song twice.
+    @Published var lyricsCache: [String: CachedLyrics] = [:]
+    @Published var lyricsLoadingSongIds: Set<String> = []
+    @Published var lyricsFailedSongIds: Set<String> = []
     @Published var currentTime: Double = 0
     @Published var duration: Double = 0
     @Published var isPlaying = false
@@ -42,6 +59,9 @@ final class PlayerViewModel: ObservableObject {
     private let nowPlayingCenter = MPNowPlayingInfoCenter.default()
     private let commandCenter = MPRemoteCommandCenter.shared()
     private let artworkCache = NSCache<NSString, UIImage>()
+    /// Dominant (average) color from album art, darkened for use as background. Keyed by song ID.
+    private var dominantColorCache: [String: Color] = [:]
+    @Published var dominantBackgroundColor: Color?
     private var lastElapsedUpdate: TimeInterval = 0
     private var routeObserver: NSObjectProtocol?
 
@@ -137,9 +157,12 @@ final class PlayerViewModel: ObservableObject {
     private func updateCurrentSong(by id: String?) {
         guard let id = id else {
             currentSong = nil
+            updateDominantColorForCurrentSong()
             return
         }
         currentSong = queue.first { $0.id == id }
+        updateDominantColorForCurrentSong()
+        if let song = currentSong { fetchLyricsIfNeeded(for: song) }
     }
 
     /// Songs after the current one in the queue (for "Up Next").
@@ -174,6 +197,8 @@ final class PlayerViewModel: ObservableObject {
             await audioService.replaceQueue(with: urls, startIndex: startIndex, songIDs: ids)
             await MainActor.run {
                 currentSong = songs[startIndex]
+                updateDominantColorForCurrentSong()
+                fetchLyricsIfNeeded(for: songs[startIndex])
                 recordPlayStart(song: songs[startIndex], source: source)
             }
             await audioService.play()
@@ -357,6 +382,104 @@ final class PlayerViewModel: ObservableObject {
         try? modelContext?.save()
     }
 
+    // MARK: - Lyrics (cache, fetch, helpers)
+
+    func lyricsFor(songId: String) -> CachedLyrics? {
+        lyricsCache[songId]
+    }
+
+    func isLyricsLoading(songId: String) -> Bool {
+        lyricsLoadingSongIds.contains(songId)
+    }
+
+    func hasLyricsReady(songId: String) -> Bool {
+        lyricsCache[songId] != nil
+    }
+
+    func lyricsFailed(songId: String) -> Bool {
+        lyricsFailedSongIds.contains(songId)
+    }
+
+    /// Called when current song changes; fetches from JioSaavn (if hasLyrics) then Gemini fallback, caches by song ID.
+    func fetchLyricsIfNeeded(for song: Song) {
+        if lyricsCache[song.id] != nil || lyricsFailedSongIds.contains(song.id) { return }
+        lyricsLoadingSongIds.insert(song.id)
+        let songId = song.id
+        let songTitle = song.title
+        let artistName = song.artistName
+        let hasLyrics = song.hasLyrics
+        let apiKey = resolveGeminiAPIKey()
+        Task {
+            let lyricsService = LyricsService()
+            var result: CachedLyrics?
+            var failed = false
+
+            // 1. JioSaavn (only if song has lyrics)
+            if hasLyrics {
+                do {
+                    if let text = try await lyricsService.fetchLyrics(songId: songId),
+                       !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        result = CachedLyrics(text: text.trimmingCharacters(in: .whitespacesAndNewlines), source: .jiosaavn)
+                    }
+                } catch {
+                    logger.debug("JioSaavn lyrics failed for \(songId): \(String(describing: error))")
+                }
+            }
+
+            // 2. Gemini fallback if no result yet
+            if result == nil {
+                if apiKey.isEmpty {
+                    failed = true
+                } else {
+                    let prompt = Constants.Gemini.lyricsPrompt(songName: songTitle, artistName: artistName)
+                    let gemini = GeminiService()
+                    do {
+                        let response = try await gemini.sendMessage(
+                            apiKey: apiKey,
+                            message: prompt,
+                            systemPrompt: "You are a lyrics provider. Return only the raw lyrics, nothing else."
+                        )
+                        let trimmed = response.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let lines = trimmed.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+                        if lines.count >= 3 && !Self.isGeminiRefusal(trimmed) {
+                            result = CachedLyrics(text: trimmed, source: .gemini)
+                        } else {
+                            failed = true
+                        }
+                    } catch {
+                        logger.debug("Gemini lyrics failed for \(songId): \(String(describing: error))")
+                        failed = true
+                    }
+                }
+            }
+
+            await MainActor.run {
+                if let result = result {
+                    lyricsCache[songId] = result
+                }
+                if failed && result == nil {
+                    lyricsFailedSongIds.insert(songId)
+                }
+                lyricsLoadingSongIds.remove(songId)
+            }
+        }
+    }
+
+    private static func isGeminiRefusal(_ response: String) -> Bool {
+        let lower = response.lowercased()
+        let phrases = ["sorry", "i can't", "not available", "i don't have", "i cannot provide", "cannot provide"]
+        return phrases.contains { lower.contains($0) }
+    }
+
+    private func resolveGeminiAPIKey() -> String {
+        guard let ctx = modelContext else { return Constants.Gemini.defaultAPIKey }
+        let descriptor = FetchDescriptor<UserPreferences>()
+        guard let prefs = try? ctx.fetch(descriptor), let first = prefs.first, let key = first.geminiAPIKey, !key.isEmpty else {
+            return Constants.Gemini.defaultAPIKey
+        }
+        return key
+    }
+
     // MARK: - Lock Screen / Control Center
 
     private func configureRemoteCommands() {
@@ -481,6 +604,8 @@ final class PlayerViewModel: ObservableObject {
             await audioService.replaceQueue(with: urls, startIndex: 0, songIDs: ids)
             await MainActor.run {
                 currentSong = current
+                updateDominantColorForCurrentSong()
+                fetchLyricsIfNeeded(for: current)
             }
         }
     }
@@ -503,7 +628,96 @@ final class PlayerViewModel: ObservableObject {
             await audioService.replaceQueue(with: urls, startIndex: newCurrentIndex, songIDs: ids)
             await MainActor.run {
                 currentSong = newQueue[newCurrentIndex]
+                updateDominantColorForCurrentSong()
+                fetchLyricsIfNeeded(for: newQueue[newCurrentIndex])
             }
         }
+    }
+
+    // MARK: - Dominant color from album art (for Mini Player & Now Playing background)
+
+    private func updateDominantColorForCurrentSong() {
+        guard let song = currentSong else {
+            withAnimation(.easeInOut(duration: 0.5)) { dominantBackgroundColor = nil }
+            return
+        }
+        let songId = song.id
+        if let cached = dominantColorCache[songId] {
+            withAnimation(.easeInOut(duration: 0.5)) { dominantBackgroundColor = cached }
+            return
+        }
+        let urlString = song.artworkURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: urlString), !urlString.isEmpty else {
+            withAnimation(.easeInOut(duration: 0.5)) { dominantBackgroundColor = nil }
+            return
+        }
+        Task.detached(priority: .utility) { [weak self] in
+            guard let self else { return }
+            var image: UIImage?
+            if let cached = self.artworkCache.object(forKey: urlString as NSString) {
+                image = cached
+            } else {
+                if let (data, _) = try? await URLSession.shared.data(from: url),
+                   let img = UIImage(data: data) {
+                    self.artworkCache.setObject(img, forKey: urlString as NSString)
+                    image = img
+                }
+            }
+            guard let img = image else {
+                await MainActor.run { withAnimation(.easeInOut(duration: 0.5)) { self.dominantBackgroundColor = nil } }
+                return
+            }
+            let color = Self.extractDominantColor(from: img)
+            guard let color = color else {
+                await MainActor.run { withAnimation(.easeInOut(duration: 0.5)) { self.dominantBackgroundColor = nil } }
+                return
+            }
+            await MainActor.run {
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    self.dominantColorCache[songId] = color
+                    self.dominantBackgroundColor = color
+                }
+            }
+        }
+    }
+
+    /// Scale image to 10×10, average pixel color, darken (×0.35) for readable backgrounds. No external deps.
+    nonisolated private static func extractDominantColor(from image: UIImage) -> Color? {
+        guard let cgImage = image.cgImage else { return nil }
+        let sampleSize = 10
+        let w = sampleSize
+        let h = sampleSize
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue
+        guard let context = CGContext(
+            data: nil,
+            width: w,
+            height: h,
+            bitsPerComponent: 8,
+            bytesPerRow: w * 4,
+            space: colorSpace,
+            bitmapInfo: bitmapInfo
+        ) else { return nil }
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: w, height: h))
+        guard let data = context.data else { return nil }
+        let ptr = data.bindMemory(to: UInt8.self, capacity: w * h * 4)
+        var r = 0, g = 0, b = 0
+        for i in 0..<(w * h) {
+            r += Int(ptr[i * 4])
+            g += Int(ptr[i * 4 + 1])
+            b += Int(ptr[i * 4 + 2])
+        }
+        let n = w * h
+        let rAvg = Double(r) / Double(n) / 255.0
+        let gAvg = Double(g) / Double(n) / 255.0
+        let bAvg = Double(b) / Double(n) / 255.0
+        let darken: Double = 0.35
+        return Color(
+            .sRGB,
+            red: min(1, rAvg * darken),
+            green: min(1, gAvg * darken),
+            blue: min(1, bAvg * darken),
+            opacity: 1
+        )
     }
 }

@@ -56,14 +56,14 @@ struct ContentView: View {
                 LibraryView()
                     .tag(Constants.Tab.library)
                     .tabItem { Label(Constants.Tab.library.rawValue, systemImage: Constants.Tab.library.icon) }
-                AIDJView()
+                AIDJView(selectedTab: $selectedTab)
                     .tag(Constants.Tab.aidj)
                     .tabItem { Label(Constants.Tab.aidj.rawValue, systemImage: Constants.Tab.aidj.icon) }
             }
             .tabViewStyle(.automatic)
             .tint(theme.colors.primaryAccent)
 
-            if playerVM.currentSong != nil {
+            if playerVM.currentSong != nil, selectedTab != .aidj {
                 VStack(spacing: 0) {
                     MiniPlayerView()
                 }

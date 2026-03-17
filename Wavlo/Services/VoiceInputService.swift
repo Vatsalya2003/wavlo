@@ -50,6 +50,18 @@ final class VoiceInputService: ObservableObject {
             return
         }
         guard !isListening else { return }
+
+        // Configure audio session for recording + playback before starting the engine.
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers, .defaultToSpeaker])
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
+        } catch {
+            logger.error("VoiceInput: audio session setup failed: \(String(describing: error))")
+            errorMessage = "Could not start microphone"
+            return
+        }
+
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         guard let request = recognitionRequest else { return }
         request.shouldReportPartialResults = true
@@ -88,6 +100,15 @@ final class VoiceInputService: ObservableObject {
         recognitionRequest = nil
         recognitionTask = nil
         isListening = false
+
+        // Restore audio session back to playback-only for the rest of the app.
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(.playback, mode: .default)
+            try session.setActive(true)
+        } catch {
+            logger.error("VoiceInput: restore audio session failed: \(String(describing: error))")
+        }
     }
 }
 

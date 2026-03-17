@@ -17,8 +17,18 @@ enum Constants {
         static let model = "gemini-flash-latest"
         static let temperature: Double = 0.9
         static let maxOutputTokens = 1024
-        /// Set your API key here; app uses this when user has not set one in Settings.
-        static let defaultAPIKey = "AIzaSyC-Xg7RxqQbo41WoBjJz5Aj5BTc9aT-pFE"
+        /// Default Gemini API key.
+        /// - First tries the process environment variable `GEMINI_API_KEY`
+        ///   (set in the Xcode scheme or on the device).
+        /// - Otherwise falls back to empty string; in that case the app
+        ///   should use the user's key from Settings.
+        static let defaultAPIKey: String = {
+            if let envKey = ProcessInfo.processInfo.environment["GEMINI_API_KEY"],
+               !envKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return envKey.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            return ""
+        }()
 
         static func generateContentURL(apiKey: String) -> URL? {
             URL(string: "\(baseURL)/\(model):generateContent?key=\(apiKey)")
@@ -128,6 +138,13 @@ Current mood: \(currentMood)
 
 Use this to personalize. Match their taste while introducing songs they might not know yet.
 """
+        }
+
+        /// Prompt for lyrics: raw lyrics only, no title/artist/brackets/commentary.
+        static func lyricsPrompt(songName: String, artistName: String) -> String {
+            """
+            Give me the complete lyrics for the song '\(songName)' by '\(artistName)'. Return ONLY the raw lyrics text. No title, no artist name at the top, no commentary, no explanations, no brackets like [Verse] or [Chorus], no annotations. Just the pure lyrics line by line exactly as they are sung.
+            """
         }
 
         /// Prompt for auto-queue recommendations (Layer 3 — Gemini). Returns JSON array of "Song Name Artist Name".

@@ -6,27 +6,37 @@ struct NowPlayingView: View {
     @EnvironmentObject private var playerVM: PlayerViewModel
     @EnvironmentObject private var theme: ThemeManager
     @Environment(\.dismiss) private var dismiss
-    @State private var showLyricsTab = false
-    @State private var lyricsText: String?
-    @State private var isLoadingLyrics = false
     @State private var showAddToPlaylistSheet = false
     @State private var showQueueSheet = false
+    @State private var swipeOffsetX: CGFloat = 0
 
     private var colors: WavloColors { theme.colors }
 
+    /// Vertical gradient: darkened dominant color at top → theme primary at bottom (Spotify-style). Optional blur overlay.
+    private var nowPlayingBackground: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    playerVM.dominantBackgroundColor ?? colors.bgPrimary,
+                    colors.bgPrimary
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            Rectangle()
+                .fill(.ultraThinMaterial.opacity(0.12))
+                .ignoresSafeArea()
+        }
+    }
+
     var body: some View {
         ZStack {
-            colors.bgPrimary.ignoresSafeArea()
+            nowPlayingBackground
             if let song = playerVM.currentSong {
                 VStack(spacing: 0) {
                     header(song: song)
-
-                    if showLyricsTab {
-                        lyricsContent(song: song)
-                    } else {
-                        nowPlayingContent(song: song)
-                    }
-
+                    nowPlayingContent(song: song)
                     progressSection
                     playbackControls()
                     bottomRow
@@ -59,24 +69,6 @@ struct NowPlayingView: View {
                     .foregroundStyle(colors.textPrimary)
             }
             Spacer()
-            HStack(spacing: 20) {
-                Button {
-                    showLyricsTab = false
-                } label: {
-                    Text("Now Playing")
-                        .font(Constants.Typography.caption)
-                        .foregroundStyle(showLyricsTab ? colors.textSecondary : colors.primaryAccent)
-                }
-                Button {
-                    showLyricsTab = true
-                    fetchLyrics(songId: song.id)
-                } label: {
-                    Text("Lyrics")
-                        .font(Constants.Typography.caption)
-                        .foregroundStyle(showLyricsTab ? colors.primaryAccent : colors.textSecondary)
-                }
-            }
-            Spacer()
             HStack(spacing: 16) {
                 Button {
                     playerVM.toggleLike(song)
@@ -101,7 +93,25 @@ struct NowPlayingView: View {
     }
 
     private func nowPlayingContent(song: Song) -> some View {
-        VStack(spacing: 32) {
+        let drag = DragGesture(minimumDistance: 20)
+            .onChanged { value in
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    swipeOffsetX = max(-24, min(24, value.translation.width))
+                }
+            }
+            .onEnded { value in
+                let width = value.translation.width
+                if width < -50 {
+                    playerVM.skipToNext()
+                } else if width > 50 {
+                    playerVM.skipToPrevious()
+                }
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    swipeOffsetX = 0
+                }
+            }
+
+        return VStack(spacing: 32) {
             AsyncImage(url: URL(string: song.artworkURL)) { phase in
                 switch phase {
                 case .success(let image):
@@ -131,36 +141,8 @@ struct NowPlayingView: View {
             }
             .padding(.horizontal, 4)
         }
-    }
-
-    private func lyricsContent(song: Song) -> some View {
-        Group {
-            if isLoadingLyrics {
-                ProgressView()
-                    .tint(colors.primaryAccent)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let text = lyricsText, !text.isEmpty {
-                LyricsView(
-                    lyrics: text,
-                    duration: Double(song.duration),
-                    currentTime: playerVM.currentTime,
-                    songTitle: song.title,
-                    artistName: song.artistName,
-                    albumName: song.albumName,
-                    artworkURL: song.artworkURL
-                )
-            } else {
-                VibeCardView(
-                    title: "No lyrics available",
-                    subtitle: "Enjoy the music",
-                    imageURL: nil,
-                    accentColor: WavloColors.accentTeal
-                )
-                .padding()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        }
-        .padding(.bottom, 8)
+        .offset(x: swipeOffsetX)
+        .highPriorityGesture(drag)
     }
 
     private var progressSection: some View {
@@ -252,18 +234,6 @@ struct NowPlayingView: View {
                 Text("Close")
                     .font(Constants.Typography.titleMedium)
                     .foregroundStyle(colors.primaryAccent)
-            }
-        }
-    }
-
-    private func fetchLyrics(songId: String) {
-        lyricsText = nil
-        isLoadingLyrics = true
-        Task {
-            let service = LyricsService()
-            lyricsText = try? await service.fetchLyrics(songId: songId)
-            await MainActor.run {
-                isLoadingLyrics = false
             }
         }
     }

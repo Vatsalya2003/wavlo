@@ -6,6 +6,7 @@ struct MiniPlayerView: View {
     @EnvironmentObject private var playerVM: PlayerViewModel
     @EnvironmentObject private var theme: ThemeManager
     @State private var showNowPlaying = false
+    @State private var dragOffsetX: CGFloat = 0
 
     private var colors: WavloColors { theme.colors }
 
@@ -14,39 +15,65 @@ struct MiniPlayerView: View {
         return playerVM.currentTime / playerVM.duration
     }
 
+    private var firstArtist: String {
+        guard let name = playerVM.currentSong?.artistName, !name.isEmpty else {
+            return "Tap to open player"
+        }
+        return name.split(separator: ",").first.map { String($0).trimmingCharacters(in: .whitespaces) } ?? name
+    }
+
     var body: some View {
+        let drag = DragGesture(minimumDistance: 20)
+            .onChanged { value in
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    dragOffsetX = max(-20, min(20, value.translation.width))
+                }
+            }
+            .onEnded { value in
+                let width = value.translation.width
+                // swipe right-to-left → next, swipe left-to-right → previous.
+                if width < -40 {
+                    playerVM.skipToNext()
+                } else if width > 40 {
+                    playerVM.skipToPrevious()
+                }
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    dragOffsetX = 0
+                }
+            }
+
         Button {
             showNowPlaying = true
         } label: {
             VStack(spacing: 0) {
                 HStack(spacing: 12) {
-                    AsyncImage(url: playerVM.currentSong.flatMap { URL(string: $0.artworkURL) }) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image.resizable().aspectRatio(contentMode: .fill)
-                        default:
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(colors.bgElevated)
+                    HStack(spacing: 12) {
+                        AsyncImage(url: playerVM.currentSong.flatMap { URL(string: $0.artworkURL) }) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image.resizable().aspectRatio(contentMode: .fill)
+                            default:
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(colors.bgElevated)
+                            }
                         }
-                    }
-                    .frame(width: Constants.Layout.miniPlayerArtworkSize, height: Constants.Layout.miniPlayerArtworkSize)
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .frame(width: Constants.Layout.miniPlayerArtworkSize, height: Constants.Layout.miniPlayerArtworkSize)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
 
-                    HStack(spacing: 4) {
-                        Text(playerVM.currentSong?.title ?? "Not playing")
-                            .font(Constants.Typography.bodyLarge)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(colors.textPrimary)
-                            .lineLimit(1)
-                        Text("•")
-                            .font(Constants.Typography.bodySmall)
-                            .foregroundStyle(colors.textSecondary)
-                        Text(playerVM.currentSong?.artistName ?? "Tap to open player")
-                            .font(Constants.Typography.bodySmall)
-                            .foregroundStyle(colors.textSecondary)
-                            .lineLimit(1)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(playerVM.currentSong?.title ?? "Not playing")
+                                .font(Constants.Typography.bodyLarge)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(colors.textPrimary)
+                                .lineLimit(1)
+                            Text(firstArtist)
+                                .font(Constants.Typography.bodySmall)
+                                .foregroundStyle(colors.textSecondary)
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .offset(x: dragOffsetX)
 
                     Button {
                         playerVM.togglePlayPause()
@@ -73,10 +100,18 @@ struct MiniPlayerView: View {
                 .frame(height: 2)
             }
             .frame(height: Constants.Layout.miniPlayerHeight + 2)
-            .background(colors.bgCard)
+            .background(
+                ZStack {
+                    colors.bgCard
+                    if let dominant = playerVM.dominantBackgroundColor {
+                        dominant.opacity(0.65)
+                    }
+                }
+            )
             .clipShape(RoundedRectangle(cornerRadius: Constants.Layout.miniPlayerCornerRadius, style: .continuous))
         }
         .buttonStyle(.plain)
+        .highPriorityGesture(drag)
         .sheet(isPresented: $showNowPlaying) {
             NowPlayingView()
                 .environmentObject(playerVM)

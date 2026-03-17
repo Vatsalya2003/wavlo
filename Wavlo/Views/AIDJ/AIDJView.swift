@@ -1,12 +1,16 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct AIDJView: View {
 
+    @Binding var selectedTab: Constants.Tab
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var playerVM: PlayerViewModel
     @EnvironmentObject private var theme: ThemeManager
     @StateObject private var viewModel = AIDJViewModel()
+    @State private var isKeyboardVisible = false
+    @State private var wasPlayingBeforeListening = false
 
     private var colors: WavloColors { theme.colors }
     @Query private var prefs: [UserPreferences]
@@ -20,16 +24,43 @@ struct AIDJView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Custom top bar — title only, no back button (Wavlo DJ is a tab)
+            // Top bar: title centered; when keyboard is visible, show a glassy floating back button to go Home.
             HStack {
+                if isKeyboardVisible {
+                    Button {
+                        dismissKeyboard()
+                        selectedTab = .home
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(.ultraThinMaterial)
+                                .frame(width: 32, height: 32)
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(colors.textPrimary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
                 Spacer()
                 Text("Wavlo DJ")
                     .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(colors.textPrimary)
                 Spacer()
+                if isKeyboardVisible {
+                    Color.clear
+                        .frame(width: 32, height: 32)
+                }
             }
-            .padding(.vertical, 12)
-            .background(colors.bgPrimary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(
+                LinearGradient(
+                    colors: [colors.bgPrimary.opacity(0.95), colors.bgPrimary.opacity(0.85)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
 
             ScrollViewReader { proxy in
                 ScrollView {
@@ -83,10 +114,26 @@ struct AIDJView: View {
                     .padding(.horizontal)
             }
 
+            if viewModel.voiceService.isListening {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 6, height: 6)
+                    Text("Listening...")
+                        .font(Constants.Typography.caption)
+                        .foregroundStyle(colors.textSecondary)
+                    Spacer()
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 2)
+            }
+
             HStack(spacing: 8) {
                 TextField("Ask Wavlo DJ...", text: $viewModel.inputText, axis: .vertical)
                     .font(Constants.Typography.bodyRegular)
                     .foregroundStyle(colors.textPrimary)
+                    .disableAutocorrection(true)
+                    .textInputAutocapitalization(.never)
                     .lineLimit(1...4)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
@@ -98,15 +145,31 @@ struct AIDJView: View {
                 Button {
                     Task {
                         if viewModel.voiceService.isListening {
+                            // Stop recording: resume playback if it was playing and send message automatically.
                             viewModel.stopListening()
+                            if wasPlayingBeforeListening {
+                                playerVM.resumePlayback()
+                                wasPlayingBeforeListening = false
+                            }
+                            let text = viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+                            if !text.isEmpty {
+                                await viewModel.sendMessage()
+                            }
                         } else {
+                            // Start recording: remember current playback state and pause music.
+                            wasPlayingBeforeListening = playerVM.isPlaying
+                            if wasPlayingBeforeListening {
+                                playerVM.pausePlayback()
+                            }
                             await viewModel.startListening()
                         }
                     }
                 } label: {
                     Image(systemName: viewModel.voiceService.isListening ? "stop.circle.fill" : "mic.circle.fill")
                         .font(.system(size: 36))
-                        .foregroundStyle(viewModel.voiceService.isListening ? WavloColors.accentTeal : colors.primaryAccent)
+                        .foregroundStyle(viewModel.voiceService.isListening ? Color.red : colors.primaryAccent)
+                        .scaleEffect(viewModel.voiceService.isListening ? 1.06 : 1.0)
+                        .animation(.easeInOut(duration: 0.2), value: viewModel.voiceService.isListening)
                 }
                 Button {
                     Task { await viewModel.sendMessage() }
@@ -120,10 +183,17 @@ struct AIDJView: View {
             .padding(.vertical, 8)
             .background(colors.bgCard)
         }
-        .padding(.bottom, playerVM.currentSong != nil ? 70 : 0)
+        // Mini player is hidden on the DJ tab, so don't reserve space for it.
+        .padding(.bottom, 0)
         .scrollContentBackground(.hidden)
         .background(colors.bgPrimary)
         .wavloKeyboardDismissToolbar()
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            isKeyboardVisible = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            isKeyboardVisible = false
+        }
         .onAppear {
             viewModel.geminiAPIKey = userPrefs?.geminiAPIKey ?? Constants.Gemini.defaultAPIKey
             viewModel.topGenres = userPrefs?.preferredGenres ?? []
@@ -135,10 +205,13 @@ struct AIDJView: View {
         }
         .environmentObject(viewModel)
     }
+    private func dismissKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
 }
 
 #Preview {
-    AIDJView()
+    AIDJView(selectedTab: .constant(.aidj))
         .environmentObject(PlayerViewModel.shared)
         .environmentObject(ThemeManager())
         .modelContainer(for: [Song.self, Playlist.self, ListeningHistory.self, UserPreferences.self], inMemory: true)

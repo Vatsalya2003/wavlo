@@ -1,0 +1,29 @@
+# Xcode / Swift
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+*.xccheckout
+
+# Swift Package Manager
+.build/
+Packages/
+
+# CocoaPods (if ever used)
+Pods/
+
+# Env / secrets
+.env
+.env.*
+!*.env.example
+
+# Firebase / Google config (real file ignored, template committed)
+Wavlo/GoogleService-Info.plist
+Wavlo/GoogleService-Info.*.plist
+
+# Config files that may contain secrets
+*.xcconfig
+
+# macOS
+.DS_Store
+
