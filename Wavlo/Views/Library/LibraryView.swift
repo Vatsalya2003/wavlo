@@ -16,6 +16,7 @@ struct LibraryView: View {
     @State private var showDeleteAlert = false
     @State private var renamingPlaylist: Playlist?
     @State private var renameText: String = ""
+    @State private var showImportSheet = false
 
     private var colors: WavloColors { theme.colors }
     private var likedSongs: [Song] { allSongs.filter { $0.isLiked } }
@@ -37,16 +38,30 @@ struct LibraryView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    if !playlists.isEmpty {
+                    HStack(spacing: 4) {
                         Button {
-                            showNewPlaylist = true
+                            showImportSheet = true
                         } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 24))
+                            Image(systemName: "square.and.arrow.down")
+                                .font(.system(size: 20))
                                 .foregroundStyle(colors.primaryAccent)
+                        }
+                        if !playlists.isEmpty {
+                            Button {
+                                showNewPlaylist = true
+                            } label: {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 24))
+                                    .foregroundStyle(colors.primaryAccent)
+                            }
                         }
                     }
                 }
+            }
+            .sheet(isPresented: $showImportSheet) {
+                ImportPlaylistView()
+                    .environmentObject(theme)
+                    .environmentObject(playerVM)
             }
             .alert("New Playlist", isPresented: $showNewPlaylist) {
                 TextField("Playlist name", text: $newPlaylistName)

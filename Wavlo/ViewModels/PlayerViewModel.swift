@@ -191,16 +191,21 @@ final class PlayerViewModel: ObservableObject {
         playedInSessionIDs.removeAll()
         ensureSongsInContext(songs)
         queue = songs
+
+        // Set currentSong synchronously BEFORE any async work so the UI and
+        // notification center always reflect the tapped song immediately.
+        // Without this, the audio service fires onCurrentItemChanged for item 0
+        // first (during replaceQueue), showing the wrong song until it catches up.
+        currentSong = songs[startIndex]
+        updateDominantColorForCurrentSong()
+        fetchLyricsIfNeeded(for: songs[startIndex])
+        recordPlayStart(song: songs[startIndex], source: source)
+        updateNowPlayingForCurrentSong()
+
         let urls = songs.compactMap { URL(string: $0.streamURL) }
         let ids = songs.map(\.id)
         Task {
             await audioService.replaceQueue(with: urls, startIndex: startIndex, songIDs: ids)
-            await MainActor.run {
-                currentSong = songs[startIndex]
-                updateDominantColorForCurrentSong()
-                fetchLyricsIfNeeded(for: songs[startIndex])
-                recordPlayStart(song: songs[startIndex], source: source)
-            }
             await audioService.play()
             await MainActor.run { isPlaying = true }
             await MainActor.run {
@@ -528,7 +533,9 @@ final class PlayerViewModel: ObservableObject {
             return
         }
 
-        var info = nowPlayingCenter.nowPlayingInfo ?? [:]
+        // Start with a fresh dict so no stale title/artwork from the previous
+        // song bleeds through while the new artwork loads asynchronously.
+        var info: [String: Any] = [:]
         info[MPMediaItemPropertyTitle] = song.title
         info[MPMediaItemPropertyArtist] = song.artistName
         info[MPMediaItemPropertyAlbumTitle] = song.albumName
@@ -539,6 +546,7 @@ final class PlayerViewModel: ObservableObject {
 
         // Artwork: set asynchronously (don’t block metadata)
         let urlString = song.artworkURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let songID = song.id
         guard let url = URL(string: urlString), !urlString.isEmpty else { return }
 
         if let cached = artworkCache.object(forKey: urlString as NSString) {
@@ -553,6 +561,8 @@ final class PlayerViewModel: ObservableObject {
                 if let img = UIImage(data: data) {
                     self.artworkCache.setObject(img, forKey: urlString as NSString)
                     await MainActor.run {
+                        // Only apply artwork if this song is still current
+                        guard self.currentSong?.id == songID else { return }
                         self.setNowPlayingArtwork(image: img)
                     }
                 }

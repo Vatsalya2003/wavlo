@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm -rf ~/Library/Developer/Xcode/DerivedData/Wavlo-dsnboulrdvbsyydllsprgvalgbzi)",
+      "Bash(rm -rf ~/Library/Developer/Xcode/DerivedData/ModuleCache.noindex)",
+      "Bash(grep -E \"\\\\.swift$\")",
+      "Bash(rm -rf ~/Library/Developer/Xcode/DerivedData/Wavlo-dsnboulrdvbsyydllsprgvalgbzi/Build)",
+      "Bash(rm -rf ~/Library/Developer/Xcode/DerivedData/Wavlo-dsnboulrdvbsyydllsprgvalgbzi/SourcePackages)"
+    ]
+  }
+}
