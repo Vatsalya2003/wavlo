@@ -291,7 +291,7 @@ Predefined text styles map to named constants: `displayMedium`, `titleLarge`, `t
 ## License & Copyright
 
 ```
-Copyright © 2024 Vatsalya Dabhi. All Rights Reserved.
+Copyright © 2026 Vatsalya Dabhi. All Rights Reserved.
 
 This software and its source code are the exclusive intellectual property
 of Vatsalya Dabhi. No part of this codebase — including but not limited
